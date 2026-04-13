@@ -10,6 +10,7 @@ packages = [{ include = "src" }]
 [tool.poetry.dependencies]
 python = ">=3.12,<3.13"
 pandas = "^3.0.2"
+torch = "^2.11.0"
 
 
 [build-system]
