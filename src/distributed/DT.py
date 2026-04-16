@@ -7,7 +7,7 @@ class DT:
 
     def __init__(self, mid: str, data_path: str):
         self.mid = mid
-        self.__model = None
+        self._model = None
         self.data = pd.read_csv(f'{data_path}/{mid}.csv')
         self.activation_date, self.stopping_date = self.__get_activation_interval()
 
@@ -23,4 +23,4 @@ class DT:
 
     @model.setter
     def model(self, model: nn.Module):
-        self.__model = model
+        self._model = model
