@@ -1,16 +1,15 @@
 import math
 import torch
+import pandas as pd
 from torch import nn
-
+from collections import OrderedDict
 from src.distributed.LearningConfig import LearningConfig
-from src.distributed.utils import ForecastLSTM, PatientSeries, compute_train_stats, normalize_series, create_train_val_loaders
+from src.distributed.utils import ForecastLSTM, PatientSeries, compute_train_stats, normalize_series, create_train_val_loaders, evaluate
 
 class DTAggregate:
 
     def __init__(self, config: LearningConfig):
         self._model = None
-        self.epochs = 10
-        self.learning_rate = 0.001 ## TODO fix this
         self._device = config.device
         self._config = config
         self._dts_data = {}
@@ -21,9 +20,17 @@ class DTAggregate:
     def notify_new_data(self, dt_id: str, new_data: PatientSeries) -> None:
         self._dts_data[dt_id] = new_data
 
-    def train(self):
-        optimizer = torch.optim.Adam(self._model.parameters(), lr=self.learning_rate)
-        self._model = ForecastLSTM(hidden_size = 64, num_layers = 1, dropout = 0.0)
+    @property
+    def model(self) -> OrderedDict[str, torch.Tensor]:
+        return self._model.state_dict()
+
+    def train(self, current_time: pd.Timestamp) -> None:
+        optimizer = torch.optim.Adam(self._model.parameters(), lr=self._config.learning_rate)
+        self._model = ForecastLSTM(
+            hidden_size = self._config.hidden_size,
+            num_layers = self._config.layers,
+            dropout = self._config.dropout,
+        )
         history: list[dict[str, float]] = []
         patients_series_raw = list(self._dts_data.values())
         mean, std = compute_train_stats(patients_series_raw)
@@ -36,7 +43,7 @@ class DTAggregate:
             batch_size = self._config.batch_size,
         )
 
-        for epoch in range(1, self.epochs + 1):
+        for epoch in range(1, self._config.epochs + 1):
             self._model.train()
             train_loss_sum = 0.0
             train_abs_error_sum = 0.0
@@ -60,7 +67,7 @@ class DTAggregate:
                 train_sq_error_sum += ((preds_denorm - y_denorm) ** 2).sum().item()
                 total_samples += batch_size
 
-            val_metrics = evaluate(self._model, val_loader, self._device, mean, std)  ## TODO add evaluate
+            val_metrics = evaluate(self._model, val_loader, self._device, mean, std)
 
             epoch_log = {
                 "epoch": epoch,
@@ -78,3 +85,8 @@ class DTAggregate:
                 f"val_rmse={epoch_log['val_rmse']:.4f} | "
                 f"val_mae={epoch_log['val_mae']:.4f}"
             )
+
+        metrics_df = pd.DataFrame(history)
+        metrics_df.to_csv(f'{self._config.data_export_path}/training-{current_time}.csv', index=False)
+
+
