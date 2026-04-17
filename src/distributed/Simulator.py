@@ -106,3 +106,9 @@ class Simulator:
             dt.deactivate()
             self._dt_aggregate.unregister_active_dt(patient_id)
             self._state.active_patients.remove(patient_id)
+
+    def __handle_train(self, event: Event):
+        current_time = event.time
+        self._dt_aggregate.update_data_from_dts(current_time)
+        self._dt_aggregate.train(current_time)
+        self._dt_aggregate.notify_new_model()
