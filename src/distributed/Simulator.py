@@ -32,7 +32,6 @@ class SimulationState:
     def __init__(self):
         self.active_patients = set()
         self.local_dts = {}
-        self.patient_configs = {}
 
 class Simulator:
 
@@ -45,7 +44,8 @@ class Simulator:
         self._ending_time = ending_time
         self._state = SimulationState()
         self._handlers = {
-            'PATIENT_BECOME_ACTIVE': self.__handle_patient_becomes_active,
+            'PATIENT_BECOMES_ACTIVE': self.__handle_patient_becomes_active,
+            'PATIENT_BECOMES_INACTIVE': self.__handle_patient_becomes_inactive,
         }
         self._dt_aggregate = DTAggregate(config, seed)
 
@@ -82,7 +82,7 @@ class Simulator:
         local_dt = self._state.local_dts[patient_id]
         local_dt.activate(current_time)
         self._state.active_patients.add(patient_id)
-        self._dt_aggregate.register_active_dt(local_dt, current_time) ## TODO Implement this
+        self._dt_aggregate.register_active_dt(local_dt, patient_id)
         local_dt.model = self._dt_aggregate.model
 
         first_forecast_time = self.forecast_policy.first_forecast_time(
@@ -98,3 +98,11 @@ class Simulator:
                 event_type="LOCAL_FORECAST",
                 payload={"patient_id": patient_id}
             ))
+
+    def __handle_patient_becomes_inactive(self, event: Event):
+        patient_id = event.payload['patient_id']
+        dt = self._state.local_dts[patient_id]
+        if dt is not None:
+            dt.deactivate()
+            self._dt_aggregate.unregister_active_dt(patient_id)
+            self._state.active_patients.remove(patient_id)
