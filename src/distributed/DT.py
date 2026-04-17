@@ -1,6 +1,5 @@
 import pandas as pd
 from torch import nn
-from datetime import datetime
 from src.distributed.DTAggregate import DTAggregate
 from src.distributed.LearningConfig import LearningConfig
 from src.distributed.utils import load_patient_series, PatientSeries
