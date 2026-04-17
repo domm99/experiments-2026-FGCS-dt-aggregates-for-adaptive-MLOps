@@ -17,9 +17,6 @@ class DTAggregate:
         self._seed = seed
         self._active_dts = {}
 
-    def notify_retraining_needed(self):
-        pass
-
     def update_data_from_dts(self, current_time: pd.Timestamp) -> None:
         for dt_id, dt in self._active_dts.items():
             self._dts_data[dt_id] = dt.get_data(current_time)
