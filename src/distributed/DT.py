@@ -49,7 +49,6 @@ class DT:
             sequence_length=self._config.sequence_length,
             prediction_horizon=self._config.prediction_horizon,
             train_ratio=self._config.train_ratio,
-            val_ratio=self._config.val_ratio,
         )
         return series
 
