@@ -19,6 +19,9 @@ class DT:
         self._is_active = True
         self._time = current_time
 
+    def deactivate(self):
+        self._is_active = False
+
     @property
     def model(self):
         return self._model
