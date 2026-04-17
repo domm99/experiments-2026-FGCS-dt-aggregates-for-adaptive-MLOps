@@ -8,11 +8,12 @@ from src.distributed.utils import ForecastLSTM, PatientSeries, compute_train_sta
 
 class DTAggregate:
 
-    def __init__(self, config: LearningConfig):
+    def __init__(self, config: LearningConfig, seed: int):
         self._model = None
         self._device = config.device
         self._config = config
         self._dts_data = {}
+        self._seed = seed
 
     def notify_retraining_needed(self):
         pass
@@ -87,6 +88,6 @@ class DTAggregate:
             )
 
         metrics_df = pd.DataFrame(history)
-        metrics_df.to_csv(f'{self._config.data_export_path}/training-{current_time}.csv', index=False)
+        metrics_df.to_csv(f'{self._config.data_export_path}/training_{current_time}-seed_{self._seed}.csv', index=False)
 
 
