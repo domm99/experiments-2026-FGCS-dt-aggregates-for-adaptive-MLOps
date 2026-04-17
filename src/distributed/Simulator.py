@@ -46,6 +46,7 @@ class Simulator:
         self._handlers = {
             'PATIENT_BECOMES_ACTIVE': self.__handle_patient_becomes_active,
             'PATIENT_BECOMES_INACTIVE': self.__handle_patient_becomes_inactive,
+            'TRAIN': self.__handle_train,
         }
         self._dt_aggregate = DTAggregate(config, seed)
 
