@@ -1,6 +1,5 @@
 import pandas as pd
 from torch import nn
-from src.distributed.DTAggregate import DTAggregate
 from src.distributed.LearningConfig import LearningConfig
 from src.distributed.utils import load_patient_series, PatientSeries, ForecastLSTM
 
@@ -41,7 +40,7 @@ class DT:
         return self._dt_aggregate
 
     @dt_aggregate.setter
-    def dt_aggregate(self, dt: DTAggregate):
+    def dt_aggregate(self, dt):
         self._dt_aggregate = dt
 
     def __get_patient_series(self, current_time: pd.Timestamp) -> PatientSeries:
