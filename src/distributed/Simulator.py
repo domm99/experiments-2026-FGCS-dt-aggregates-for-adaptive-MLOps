@@ -76,7 +76,7 @@ class Simulator:
         local_dt.activate(current_time)
         self._state.active_patients.add(patient_id)
         self._dt_aggregate.register_active_dt(local_dt, patient_id)
-        local_dt.model = self._dt_aggregate.model
+        local_dt.model = (self._dt_aggregate.model, 0.0, 0.0)
 
     def __handle_patient_becomes_inactive(self, event: Event):
         patient_id = event.payload['patient_id']
