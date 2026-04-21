@@ -64,6 +64,8 @@ class Simulator:
         patient_id = event.payload['patient_id']
         current_time = event.time
 
+        print(f'========= Patient becoming active at:{current_time} =========')
+
         if patient_id in self._state.active_patients:
             return
 
@@ -79,6 +81,9 @@ class Simulator:
 
     def __handle_patient_becomes_inactive(self, event: Event):
         patient_id = event.payload['patient_id']
+
+        print(f'========= Patient becoming inactive at:{event.time} =========')
+
         dt = self._state.local_dts[patient_id]
         if dt is not None:
             dt.deactivate()
@@ -87,12 +92,14 @@ class Simulator:
 
     def __handle_train(self, event: Event):
         current_time = event.time
+        print(f'========= Training at:{current_time} =========')
         self._dt_aggregate.update_data_from_dts(current_time)
         self._dt_aggregate.train(current_time)
         self._dt_aggregate.notify_new_model()
 
     def __handle_inference(self, event: Event):
         current_time = event.time
+        print(f'========= Inference at:{current_time} =========')
         last_training_time = event.payload['last_training_time']
         for local_dt in self._dt_aggregate.active_dts:
             local_dt.inference(current_time, last_training_time)
