@@ -42,6 +42,10 @@ class DTAggregate:
     def model(self) -> dict[str, torch.Tensor]:
         return self._model.state_dict()
 
+    @property
+    def statistics(self) -> tuple[float, float]:
+        return self._last_mean, self._last_std
+
     def notify_new_model(self):
         for dt in self._active_dts.values():
             dt.model = (self._model.state_dict(), self._last_mean, self._last_std)
