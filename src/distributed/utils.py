@@ -96,6 +96,18 @@ def seed_everything(seed: int) -> None:
     torch.use_deterministic_algorithms(True)
 
 
+def _prepare_patient_dataframe(patient_dataframe: pd.DataFrame) -> pd.DataFrame:
+    df = patient_dataframe.copy()
+    if "timestamp" not in df.columns:
+        df["timestamp"] = pd.to_datetime(
+            df["Measurement_date"] + " " + df["Measurement_time"],
+            format="%Y-%m-%d %H:%M:%S",
+            errors="coerce",
+        )
+    df = df.dropna(subset=["timestamp", "Measurement"]).sort_values("timestamp")
+    return df
+
+
 def load_patient_series(
     patient_id: str,
     patient_dataframe: pd.DataFrame,
@@ -103,13 +115,7 @@ def load_patient_series(
     prediction_horizon: int,
     train_ratio: float,
 ) -> PatientSeries:
-    df = patient_dataframe.copy()
-    df["timestamp"] = pd.to_datetime(
-        df["Measurement_date"] + " " + df["Measurement_time"],
-        format="%Y-%m-%d %H:%M:%S",
-        errors="coerce",
-    )
-    df = df.dropna(subset=["timestamp", "Measurement"]).sort_values("timestamp")
+    df = _prepare_patient_dataframe(patient_dataframe)
 
     min_required = sequence_length + prediction_horizon + 1
     if len(df) <= min_required:
@@ -132,6 +138,32 @@ def load_patient_series(
         values=values,
         train_end=train_end,
         val_end=n_total,
+    )
+
+
+def load_test_patient_series(
+    patient_id: str,
+    patient_dataframe: pd.DataFrame,
+    sequence_length: int,
+    prediction_horizon: int,
+) -> PatientSeries | None:
+    df = _prepare_patient_dataframe(patient_dataframe)
+
+    min_required = sequence_length + prediction_horizon + 1
+    if len(df) < min_required:
+        return None
+
+    values = torch.tensor(
+        df["Measurement"].astype(float).to_numpy(),
+        dtype=torch.float32,
+    )
+
+    return PatientSeries(
+        patient_id=str(df["Patient_ID"].iloc[0]) if not df.empty else patient_id,
+        timestamps=df["timestamp"].tolist(),
+        values=values,
+        train_end=len(values),
+        val_end=len(values),
     )
 
 

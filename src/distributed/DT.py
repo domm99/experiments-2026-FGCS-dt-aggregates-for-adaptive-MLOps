@@ -2,7 +2,7 @@ import torch
 import pandas as pd
 from collections import OrderedDict
 from src.distributed.LearningConfig import LearningConfig
-from src.distributed.utils import load_patient_series, PatientSeries, ForecastLSTM, evaluate, create_test_loaders, normalize_series
+from src.distributed.utils import load_patient_series, load_test_patient_series, PatientSeries, ForecastLSTM, evaluate, create_test_loaders, normalize_series
 
 class DT:
 
@@ -50,14 +50,16 @@ class DT:
     def dt_aggregate(self, dt):
         self._dt_aggregate = dt
 
-    def __get_patient_series(self, current_time: pd.Timestamp, last_train_time: pd.Timestamp = None) -> PatientSeries:
+    def __filter_data_by_time(self, current_time: pd.Timestamp, last_train_time: pd.Timestamp = None) -> pd.DataFrame:
         if last_train_time is None:
-            filtered_df = self._data[self._data['timestamp'] <= current_time]
-        else:
-            filtered_df = self._data[
-                (self._data['timestamp'] >= last_train_time) &
-                (self._data['timestamp'] <= current_time)
-            ]
+            return self._data[self._data['timestamp'] <= current_time]
+        return self._data[
+            (self._data['timestamp'] >= last_train_time) &
+            (self._data['timestamp'] <= current_time)
+        ]
+
+    def __get_patient_series(self, current_time: pd.Timestamp, last_train_time: pd.Timestamp = None) -> PatientSeries:
+        filtered_df = self.__filter_data_by_time(current_time, last_train_time)
         series = load_patient_series(
             patient_id=self._mid,
             patient_dataframe=filtered_df,
@@ -72,8 +74,22 @@ class DT:
         return my_series
 
     def inference(self, current_time: pd.Timestamp, last_training_time: pd.Timestamp) -> pd.DataFrame:
-        loader = self.__test_loader_from_data(current_time, last_training_time)
+        loader, num_points = self.__test_loader_from_data(current_time, last_training_time)
+        if loader is None:
+            self.__export_test_metrics(
+                {
+                    'status': 'skipped_short_test_window',
+                    'num_points': num_points,
+                    'mse': float('nan'),
+                    'mae': float('nan'),
+                    'rmse': float('nan'),
+                },
+                current_time,
+            )
+            return
         metrics = evaluate(self._model, loader, self._config.device, self._last_mean, self._last_std)
+        metrics['status'] = 'evaluated'
+        metrics['num_points'] = num_points
         self.__export_test_metrics(metrics, current_time)
 
     def __upload_data(self, data_path: str, mid: str) -> pd.DataFrame:
@@ -84,7 +100,15 @@ class DT:
         return data
 
     def __test_loader_from_data(self, current_time: pd.Timestamp, last_training_time: pd.Timestamp):
-        series = self.__get_patient_series(current_time, last_training_time)
+        filtered_df = self.__filter_data_by_time(current_time, last_training_time)
+        series = load_test_patient_series(
+            patient_id=self._mid,
+            patient_dataframe=filtered_df,
+            sequence_length=self._config.sequence_length,
+            prediction_horizon=self._config.prediction_horizon,
+        )
+        if series is None:
+            return None, len(filtered_df)
         normalized_series = normalize_series(series, self._last_mean, self._last_std)
         loader = create_test_loaders(
             normalized_series,
@@ -92,7 +116,7 @@ class DT:
             self._config.prediction_horizon,
             self._config.stride,
             self._config.batch_size)
-        return loader
+        return loader, len(series.values)
 
     def __export_test_metrics(self, metrics: dict, current_time: pd.Timestamp):
         metrics_df = pd.DataFrame([metrics])
