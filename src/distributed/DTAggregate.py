@@ -1,12 +1,10 @@
 import math
-from typing import Any
 import torch
 import pandas as pd
 from torch import nn
 from src.distributed.DT import DT
-from collections import OrderedDict
 from src.distributed.LearningConfig import LearningConfig
-from src.distributed.utils import ForecastLSTM, PatientSeries, compute_train_stats, normalize_series, create_train_val_loaders, evaluate
+from src.distributed.utils import ForecastLSTM, compute_train_stats, normalize_series, create_train_val_loaders, evaluate
 
 class DTAggregate:
 
