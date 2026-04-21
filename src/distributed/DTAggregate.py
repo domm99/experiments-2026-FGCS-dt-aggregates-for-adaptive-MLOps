@@ -1,4 +1,5 @@
 import math
+from typing import Any
 import torch
 import pandas as pd
 from torch import nn
@@ -38,7 +39,7 @@ class DTAggregate:
         return list(self._active_dts.values())
 
     @property
-    def model(self) -> OrderedDict[str, torch.Tensor]:
+    def model(self) -> dict[str, torch.Tensor]:
         return self._model.state_dict()
 
     def notify_new_model(self):

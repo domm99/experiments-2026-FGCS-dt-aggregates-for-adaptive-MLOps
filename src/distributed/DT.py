@@ -1,5 +1,6 @@
+import torch
 import pandas as pd
-from torch import nn
+from collections import OrderedDict
 from src.distributed.LearningConfig import LearningConfig
 from src.distributed.utils import load_patient_series, PatientSeries, ForecastLSTM, evaluate, create_test_loaders
 
@@ -29,14 +30,14 @@ class DT:
         return self._model
 
     @model.setter
-    def model(self, data: tuple[nn.Module, float, float]):
+    def model(self, data: tuple[OrderedDict[str, torch.Tensor], float, float]):
         model, mean, std = data
         fresh_model = ForecastLSTM(
             hidden_size=self._config.hidden_size,
             num_layers=self._config.layers,
             dropout=self._config.dropout,
         )
-        fresh_model.load_state_dict(model.state_dict())
+        fresh_model.load_state_dict(model)
         self._model = fresh_model
         self._last_mean = mean
         self._last_std = std
