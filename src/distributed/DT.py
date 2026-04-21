@@ -36,7 +36,7 @@ class DT:
             hidden_size=self._config.hidden_size,
             num_layers=self._config.layers,
             dropout=self._config.dropout,
-        )
+        ).to(self._config.device)
         fresh_model.load_state_dict(model)
         self._model = fresh_model
         self._last_mean = mean
