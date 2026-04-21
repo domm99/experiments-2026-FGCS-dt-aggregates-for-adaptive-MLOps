@@ -2,7 +2,7 @@ import torch
 import pandas as pd
 from collections import OrderedDict
 from src.distributed.LearningConfig import LearningConfig
-from src.distributed.utils import load_patient_series, PatientSeries, ForecastLSTM, evaluate, create_test_loaders
+from src.distributed.utils import load_patient_series, PatientSeries, ForecastLSTM, evaluate, create_test_loaders, normalize_series
 
 class DT:
 
@@ -85,8 +85,9 @@ class DT:
 
     def __test_loader_from_data(self, current_time: pd.Timestamp, last_training_time: pd.Timestamp):
         series = self.__get_patient_series(current_time, last_training_time)
+        normalized_series = normalize_series(series, self._last_mean, self._last_std)
         loader = create_test_loaders(
-            series,
+            normalized_series,
             self._config.sequence_length,
             self._config.prediction_horizon,
             self._config.stride,

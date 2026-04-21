@@ -142,8 +142,12 @@ def compute_train_stats(patient_series: list[PatientSeries]) -> tuple[float, flo
     return mean, std if std > 0 else 1.0
 
 
-def normalize_series(patient_series: list[PatientSeries], mean: float, std: float) -> list[PatientSeries]:
+def normalize_series(patient_series: list[PatientSeries] | PatientSeries, mean: float, std: float) -> list[PatientSeries]:
     normalized: list[PatientSeries] = []
+
+    if isinstance(patient_series, PatientSeries):
+        patient_series = [patient_series]
+
     for series in patient_series:
         normalized.append(
             PatientSeries(
