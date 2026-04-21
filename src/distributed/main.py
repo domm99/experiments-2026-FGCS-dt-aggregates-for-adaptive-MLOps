@@ -83,3 +83,5 @@ if __name__ == "__main__":
 
             # Schedule trainings and inferences
             schedule_trainings(experiment, simulator, min_time)
+
+            simulator.start()
