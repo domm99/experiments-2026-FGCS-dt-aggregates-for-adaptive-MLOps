@@ -1,3 +1,4 @@
+import glob
 import torch
 import pandas as pd
 from collections import OrderedDict
@@ -119,5 +120,11 @@ class DT:
         return loader, len(series.values)
 
     def __export_test_metrics(self, metrics: dict, current_time: pd.Timestamp):
-        metrics_df = pd.DataFrame([metrics])
-        metrics_df.to_csv(f'{self._config.data_export_path}/test_{current_time}-DT_{self._mid}-seed_{self._seed}.csv', index=False)
+        files = glob.glob(f'{self._config.data_export_path}/*{current_time}*.csv')
+        metrics['dt_id'] = self._mid
+        if len(files) == 0:
+            metrics_df = pd.DataFrame([metrics])
+        else:
+            metrics_df = pd.read_csv(files[0])
+            metrics_df = pd.concat([metrics_df, pd.DataFrame([metrics])], ignore_index=True)
+        metrics_df.to_csv(f'{self._config.data_export_path}/test_{current_time}-seed_{self._seed}.csv', index=False)
