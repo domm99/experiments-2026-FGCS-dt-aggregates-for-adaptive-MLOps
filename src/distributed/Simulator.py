@@ -51,15 +51,6 @@ class Simulator:
         }
         self._dt_aggregate = DTAggregate(config, seed)
 
-    def init_dts(self):
-        files = glob.glob(f'{self.data_folder}/*.csv')
-        dts = []
-        for file in files:
-            dt_id = file.split('/')[-1].split('.')[0]
-            new_dt = DT(dt_id, self.data_folder, self._config)
-            dts.append(new_dt)
-        return dts
-
     def schedule_event(self, event: Event) -> None:
         self._queue.push(event)
 
