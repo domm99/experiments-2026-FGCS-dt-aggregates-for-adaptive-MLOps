@@ -79,7 +79,7 @@ class Simulator:
             return
 
         if patient_id not in self._state.local_dts:
-            self._state.local_dts[patient_id] = DT(patient_id, self.data_folder, self._config)
+            self._state.local_dts[patient_id] = DT(patient_id, self.data_folder, self._config, self.seed)
 
         local_dt = self._state.local_dts[patient_id]
         local_dt.activate(current_time)

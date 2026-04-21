@@ -5,9 +5,10 @@ from src.distributed.utils import load_patient_series, PatientSeries, ForecastLS
 
 class DT:
 
-    def __init__(self, mid: str, data_path: str, config: LearningConfig):
+    def __init__(self, mid: str, data_path: str, config: LearningConfig, seed: int):
         self._mid = mid
         self._time = None
+        self._seed = seed
         self._model = None
         self._last_std = 0.0
         self._last_mean = 0.0
