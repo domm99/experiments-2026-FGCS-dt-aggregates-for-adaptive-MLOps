@@ -103,5 +103,6 @@ class Simulator:
 
     def __handle_inference(self, event: Event):
         current_time = event.time
+        last_training_time = event.payload['last_training_time']
         for local_dt in self._dt_aggregate.active_dts:
-            local_dt.inference(current_time)
+            local_dt.inference(current_time, last_training_time)
