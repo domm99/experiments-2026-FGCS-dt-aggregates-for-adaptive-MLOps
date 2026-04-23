@@ -1,5 +1,4 @@
 import pandas as pd
-
 from src.distributed.Simulator import Event, Monitor, Simulator
 
 
@@ -165,3 +164,46 @@ class PerformanceDriftMonitor(Monitor):
         if baseline_scale == 0:
             return delta > 0
         return (delta / baseline_scale) >= self._degradation_threshold
+
+
+class ActivationPatientsMonitor(Monitor):
+
+    def __init__(self, simulator: Simulator, activation_threshold: int):
+        super().__init__(simulator)
+        self._activated_dts = 0
+        self._last_active_dts = 0
+        self._activation_threshold = activation_threshold
+        self._is_first_train = True
+        self._last_training_time = None
+
+    def update(self):
+        active_dts = len(self._simulator._state.active_patients)
+        delta = active_dts - self._last_active_dts
+        self._last_active_dts = active_dts
+        self._activated_dts += delta
+
+        if self._activated_dts > self._activation_threshold:
+            ### Enough DTs have been activated, so I'm going to schedule a train
+            print('========= SCHEDULING TRAIN =========')
+            current_time = self._simulator.time
+
+            train_event = Event(
+                time=current_time + pd.DateOffset(days=1),
+                priority=2,
+                event_type='TRAIN',
+                payload={},
+            )
+            self._simulator.schedule_event(train_event)
+            if not self._is_first_train:
+                print('========= SCHEDULING INFERENCE =========')
+                test_event = Event(
+                    time=current_time,
+                    priority=2,
+                    event_type='INFERENCE',
+                    payload={'last_training_time': self._last_training_time},
+                )
+                self._simulator.schedule_event(test_event)
+
+            self._last_training_time = current_time + pd.DateOffset(days=1)
+            self._activated_dts = 0
+            self._is_first_train = False

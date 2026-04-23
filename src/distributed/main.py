@@ -7,6 +7,7 @@ from src.distributed.Simulator import Simulator, Event
 from src.distributed.LearningConfig import LearningConfig
 from src.distributed.Monitors import ActivationPatientsMonitor, PerformanceDriftMonitor
 
+
 def load_patients(data_folder: str) -> tuple[list[dict], pd.Timestamp, pd.Timestamp]:
     patients = []
     global_min, global_max = None, None

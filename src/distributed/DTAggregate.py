@@ -66,6 +66,8 @@ class DTAggregate:
         optimizer = torch.optim.Adam(self._model.parameters(), lr=self._config.learning_rate)
         history: list[dict[str, float]] = []
         patients_series_raw = list(self._dts_data.values())
+        if not patients_series_raw:
+            return False
         mean, std = compute_train_stats(patients_series_raw)
         normalized_series = normalize_series(patients_series_raw, mean, std)
         train_loader, val_loader = create_train_val_loaders(

@@ -114,13 +114,13 @@ def load_patient_series(
     sequence_length: int,
     prediction_horizon: int,
     train_ratio: float,
-) -> PatientSeries:
+) -> PatientSeries | None:
     df = _prepare_patient_dataframe(patient_dataframe)
 
     min_required = sequence_length + prediction_horizon + 1
     if len(df) <= min_required:
-        raise Exception(f"No valid patient series found for {patient_id}")
-
+        #raise Exception(f"No valid patient series found for {patient_id}")
+        return None
     values = torch.tensor(
         df["Measurement"].astype(float).to_numpy(),
         dtype=torch.float32,
