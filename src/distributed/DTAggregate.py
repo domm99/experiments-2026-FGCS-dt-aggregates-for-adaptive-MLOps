@@ -32,7 +32,11 @@ class DTAggregate:
         self._dts_data = {}
         for dt_id, dt in self._active_dts.items():
             try:
-                self._dts_data[dt_id] = dt.get_data(current_time)
+                patient_series = dt.get_data(current_time)
+                if patient_series is None:
+                    print(f'Skipping DT {dt_id} during training: not enough history yet')
+                    continue
+                self._dts_data[dt_id] = patient_series
             except Exception as exc:
                 print(f'Skipping DT {dt_id} during training: {exc}')
 
@@ -48,7 +52,7 @@ class DTAggregate:
 
     @property
     def trainable_dt_count(self) -> int:
-        return len(self._dts_data)
+        return sum(1 for series in self._dts_data.values() if series is not None)
 
     @property
     def model(self) -> dict[str, torch.Tensor]:
@@ -70,8 +74,9 @@ class DTAggregate:
         ).to(self._config.device)
         optimizer = torch.optim.Adam(self._model.parameters(), lr=self._config.learning_rate)
         history: list[dict[str, float]] = []
-        patients_series_raw = list(self._dts_data.values())
+        patients_series_raw = [series for series in self._dts_data.values() if series is not None]
         if not patients_series_raw:
+            print('Skipping training: no DT has enough history for training windows yet')
             return False
         mean, std = compute_train_stats(patients_series_raw)
         normalized_series = normalize_series(patients_series_raw, mean, std)
