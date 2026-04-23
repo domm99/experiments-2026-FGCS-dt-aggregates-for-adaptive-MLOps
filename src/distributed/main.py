@@ -56,7 +56,7 @@ def schedule_trainings(experiment: str, simulator: Simulator, min_time: pd.Times
     elif experiment == 'RetrainAfterPerformanceDrift':
         PerformanceDriftMonitor(
             simulator=simulator,
-            bootstrap_months=3,
+            bootstrap_months=9,
             inference_interval_days=1,
             retraining_delay_days=1,
             metric_name='rmse',
