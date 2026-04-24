@@ -4,8 +4,11 @@ from torch import nn
 from src.distributed.DT import DT
 from src.distributed.LearningConfig import LearningConfig
 from src.distributed.utils import (
+    CLASS_NAMES,
     GlucoseClassifierLSTM,
+    compute_class_weights,
     compute_train_stats,
+    cross_entropy_batch,
     normalize_series,
     create_train_val_loaders,
     evaluate,
@@ -86,10 +89,30 @@ class DTAggregate:
             stride = self._config.stride,
             batch_size = self._config.batch_size,
         )
+        class_weights, class_counts = compute_class_weights(
+            patient_series=normalized_series,
+            sequence_length=self._config.sequence_length,
+            stride=self._config.stride,
+            split="train",
+        )
+        loss_weights = class_weights.to(self._device)
+        print(
+            "Training class balance | "
+            + " | ".join(
+                f"{name}={int(count)}"
+                for name, count in zip(CLASS_NAMES, class_counts.tolist(), strict=False)
+            )
+            + " | "
+            + " | ".join(
+                f"{name}_weight={weight:.4f}"
+                for name, weight in zip(CLASS_NAMES, class_weights.tolist(), strict=False)
+            )
+        )
 
         for epoch in range(1, self._config.epochs + 1):
             self._model.train()
             train_loss_sum = 0.0
+            train_loss_normalization = 0.0
             train_correct = 0
             total_samples = 0
             for x, y in train_loader:
@@ -98,20 +121,21 @@ class DTAggregate:
 
                 optimizer.zero_grad()
                 logits = self._model(x)
-                loss = nn.functional.cross_entropy(logits, y)
+                loss, loss_sum, loss_normalization = cross_entropy_batch(logits, y, loss_weights)
                 loss.backward()
                 optimizer.step()
 
                 batch_size = y.size(0)
-                train_loss_sum += loss.item() * batch_size
+                train_loss_sum += loss_sum
+                train_loss_normalization += loss_normalization
                 train_correct += (logits.argmax(dim=1) == y).sum().item()
                 total_samples += batch_size
 
-            val_metrics = evaluate(self._model, val_loader, self._device)
+            val_metrics = evaluate(self._model, val_loader, self._device, class_weights=class_weights)
 
             epoch_log = {
                 "epoch": epoch,
-                "train_loss": train_loss_sum / max(total_samples, 1),
+                "train_loss": train_loss_sum / max(train_loss_normalization, 1.0),
                 "train_accuracy": train_correct / max(total_samples, 1),
                 "val_loss": val_metrics["loss"],
                 "val_accuracy": val_metrics["accuracy"],

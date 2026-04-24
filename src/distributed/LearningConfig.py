@@ -13,7 +13,7 @@ def get_current_device():
 @dataclass
 class LearningConfig:
     layers: int = 1
-    epochs: int = 12
+    epochs: int = 4
     stride: int = 12
     dropout: float = 0.0
     hidden_size: int = 64

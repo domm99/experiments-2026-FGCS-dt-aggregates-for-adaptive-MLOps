@@ -262,29 +262,83 @@ def create_test_loaders(
     return DataLoader(test_dataset, batch_size=batch_size, shuffle=False)
 
 
+def compute_class_weights(
+    patient_series: list[PatientSeries] | PatientSeries,
+    sequence_length: int,
+    stride: int,
+    split: str = "train",
+) -> tuple[torch.Tensor, torch.Tensor]:
+    dataset = GlucoseWindowDataset(
+        patient_series,
+        sequence_length,
+        split=split,
+        stride=stride,
+    )
+    class_counts = torch.zeros(len(CLASS_NAMES), dtype=torch.long)
+
+    for patient_index, input_end_idx in dataset.samples:
+        series = dataset.patient_series[patient_index]
+        target_idx = input_end_idx - 1
+        class_index = int(series.labels[target_idx].item())
+        class_counts[class_index] += 1
+
+    if class_counts.sum().item() == 0:
+        raise RuntimeError(f"No samples available to compute class weights for split={split!r}")
+
+    class_weights = class_counts.sum().float() / (len(CLASS_NAMES) * class_counts.clamp_min(1).float())
+    return class_weights, class_counts
+
+
+def cross_entropy_batch(
+    logits: torch.Tensor,
+    targets: torch.Tensor,
+    class_weights: torch.Tensor | None = None,
+) -> tuple[torch.Tensor, float, float]:
+    per_sample_loss = nn.functional.cross_entropy(
+        logits,
+        targets,
+        weight=class_weights,
+        reduction="none",
+    )
+    loss_sum = per_sample_loss.sum()
+
+    if class_weights is None:
+        normalization = float(targets.numel())
+    else:
+        normalization = float(class_weights[targets].sum().item())
+
+    normalization = max(normalization, 1.0)
+    loss = loss_sum / normalization
+    return loss, float(loss_sum.item()), normalization
+
+
 def evaluate(
     model: nn.Module,
     loader: DataLoader,
     device: torch.device,
+    class_weights: torch.Tensor | None = None,
 ) -> dict[str, float]:
     model.eval()
     total_loss = 0.0
+    total_loss_normalization = 0.0
     total_samples = 0
     total_correct = 0
+    loss_weights = class_weights.to(device) if class_weights is not None else None
 
     with torch.no_grad():
         for x, y in loader:
             x = x.to(device)
             y = y.to(device)
             logits = model(x)
-            loss = nn.functional.cross_entropy(logits, y, reduction="sum")
             predictions = logits.argmax(dim=1)
+            _, loss_sum, loss_normalization = cross_entropy_batch(logits, y, loss_weights)
 
-            total_loss += loss.item()
+            total_loss += loss_sum
+            total_loss_normalization += loss_normalization
             total_samples += y.size(0)
             total_correct += (predictions == y).sum().item()
 
     return {
-        "loss": total_loss / max(total_samples, 1),
+        "loss": total_loss / max(total_loss_normalization, 1.0),
         "accuracy": total_correct / max(total_samples, 1),
     }
