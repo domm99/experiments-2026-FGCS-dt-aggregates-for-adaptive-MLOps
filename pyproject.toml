@@ -13,6 +13,7 @@ pandas = "^3.0.2"
 torch = "^2.11.0"
 matplotlib = "^3.10.7"
 codecarbon = "^3.2.6"
+seaborn = "^0.13.2"
 
 
 [build-system]
