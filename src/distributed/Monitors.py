@@ -313,6 +313,55 @@ class PerformanceDriftMonitor(Monitor):
         return (delta / baseline_scale) >= self._degradation_threshold
 
 
+class PeriodicInferenceMonitor(Monitor):
+
+    def __init__(
+        self,
+        simulator: Simulator,
+        inference_interval_days: int,
+        inference_priority: int = 2,
+    ) -> None:
+        super().__init__(simulator)
+        self._inference_interval_days = inference_interval_days
+        self._inference_priority = inference_priority
+        self._source = 'periodic_evaluation'
+
+    def on_event(self, event: Event) -> None:
+        if event.event_type == 'TRAIN':
+            if self._simulator.state.last_training_time == event.time:
+                self._schedule_next_inference(event.time, event.time)
+            return
+
+        if event.event_type != 'INFERENCE':
+            return
+
+        if event.payload.get('source') != self._source:
+            return
+
+        last_training_time = event.payload['last_training_time']
+        if self._simulator.state.last_training_time != last_training_time:
+            return
+
+        self._schedule_next_inference(event.time, last_training_time)
+
+    def _schedule_next_inference(
+        self,
+        current_time: pd.Timestamp,
+        last_training_time: pd.Timestamp,
+    ) -> bool:
+        return self._simulator.schedule_event(
+            Event(
+                time=current_time + pd.DateOffset(days=self._inference_interval_days),
+                priority=self._inference_priority,
+                event_type='INFERENCE',
+                payload={
+                    'last_training_time': last_training_time,
+                    'source': self._source,
+                },
+            )
+        )
+
+
 class ActivationPatientsMonitor(Monitor):
 
     def __init__(self, simulator: Simulator, activation_threshold: int):
@@ -320,8 +369,6 @@ class ActivationPatientsMonitor(Monitor):
         self._activated_dts = 0
         self._last_active_dts = 0
         self._activation_threshold = activation_threshold
-        self._is_first_train = True
-        self._last_training_time = None
 
     def on_event(self, event: Event):
         active_dts = len(self._simulator._state.active_patients)
@@ -341,16 +388,5 @@ class ActivationPatientsMonitor(Monitor):
                 payload={},
             )
             self._simulator.schedule_event(train_event)
-            if not self._is_first_train:
-                print('========= SCHEDULING INFERENCE =========')
-                test_event = Event(
-                    time=current_time,
-                    priority=2,
-                    event_type='INFERENCE',
-                    payload={'last_training_time': self._last_training_time},
-                )
-                self._simulator.schedule_event(test_event)
 
-            self._last_training_time = current_time + pd.DateOffset(days=1)
             self._activated_dts = 0
-            self._is_first_train = False
