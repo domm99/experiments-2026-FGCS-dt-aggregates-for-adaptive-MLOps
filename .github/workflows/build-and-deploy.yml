@@ -28,11 +28,6 @@ jobs:
         uses: actions/setup-node@v6.0.0
         with:
           node-version: ${{ steps.node-version.outputs.version }}
-      - name: Login to dockerhub
-        env:
-          DOCKER_PASSWORD: ${{ secrets.DOCKER_PASSWORD }}
-          DOCKER_USERNAME: ${{ secrets.DOCKER_USERNAME }}
-        run: echo "$DOCKER_PASSWORD" | docker login -u "$DOCKER_USERNAME" --password-stdin docker.io
       - name: Semantic Release
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
