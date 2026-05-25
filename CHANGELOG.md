@@ -1,3 +1,13 @@
+## [1.1.0](https://github.com/domm99/experiments-2026-FGCS-dt-aggregates-for-adaptive-MLOps/compare/1.0.0...1.1.0) (2026-05-25)
+
+### Features
+
+* logging more metrics ([34b9af1](https://github.com/domm99/experiments-2026-FGCS-dt-aggregates-for-adaptive-MLOps/commit/34b9af1576c71fa2e77619f9395d3cee1e68c5cb))
+
+### General maintenance
+
+* **release:** update .env versions to 1.0.0 [skip ci] ([1c523e2](https://github.com/domm99/experiments-2026-FGCS-dt-aggregates-for-adaptive-MLOps/commit/1c523e2687dd0c9818277355b9ebdd2604d2a125))
+
 ## 1.0.0 (2026-04-27)
 
 ### Features
