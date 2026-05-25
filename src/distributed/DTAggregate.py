@@ -147,6 +147,11 @@ class DTAggregate:
                 "val_recall": val_metrics["recall"],
                 "val_f1_score": val_metrics["f1_score"],
             }
+            for class_name in CLASS_NAMES:
+                epoch_log[f"train_precision_{class_name}"] = train_metrics[f"precision_{class_name}"]
+                epoch_log[f"train_recall_{class_name}"] = train_metrics[f"recall_{class_name}"]
+                epoch_log[f"val_precision_{class_name}"] = val_metrics[f"precision_{class_name}"]
+                epoch_log[f"val_recall_{class_name}"] = val_metrics[f"recall_{class_name}"]
             history.append(epoch_log)
             print(
                 f"Epoch {epoch:02d} | "
