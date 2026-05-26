@@ -332,6 +332,9 @@ def classification_metrics_from_confusion_matrix(confusion_matrix: torch.Tensor)
     total = counts.sum()
     if total.item() == 0:
         metrics = {
+            "prediction_count": 0,
+            "prediction_correct_count": 0,
+            "prediction_error_count": 0,
             "accuracy": 0.0,
             "precision": 0.0,
             "recall": 0.0,
@@ -362,10 +365,15 @@ def classification_metrics_from_confusion_matrix(confusion_matrix: torch.Tensor)
         2.0 * precision_per_class * recall_per_class / f1_denominator,
         torch.zeros_like(f1_denominator),
     )
+    correct_predictions = true_positives.sum().item()
+    prediction_count = total.item()
 
     # Macro averages keep each class equally important despite imbalance.
     metrics = {
-        "accuracy": float(true_positives.sum().item() / total.item()),
+        "prediction_count": int(prediction_count),
+        "prediction_correct_count": int(correct_predictions),
+        "prediction_error_count": int(prediction_count - correct_predictions),
+        "accuracy": float(correct_predictions / prediction_count),
         "precision": float(precision_per_class.mean().item()),
         "recall": float(recall_per_class.mean().item()),
         "f1_score": float(f1_per_class.mean().item()),

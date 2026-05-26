@@ -33,5 +33,6 @@ class LearningConfig:
     drift_threshold_mode: str = 'relative'
     drift_higher_is_worse: bool = False
     degraded_dt_fraction_threshold: float = 0.2
+    adwin_delta: float = 0.002
     data_export_path: str = 'data'
     device: torch.device = get_current_device()

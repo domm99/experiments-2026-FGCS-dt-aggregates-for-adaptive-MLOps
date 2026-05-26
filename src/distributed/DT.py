@@ -88,6 +88,9 @@ class DT:
             metrics = {
                 'status': 'skipped_no_model',
                 'num_points': 0,
+                'prediction_count': 0,
+                'prediction_correct_count': 0,
+                'prediction_error_count': 0,
                 'loss': float('nan'),
                 'accuracy': float('nan'),
                 'precision': float('nan'),
@@ -101,6 +104,9 @@ class DT:
             metrics = {
                 'status': 'skipped_short_test_window',
                 'num_points': num_points,
+                'prediction_count': 0,
+                'prediction_correct_count': 0,
+                'prediction_error_count': 0,
                 'loss': float('nan'),
                 'accuracy': float('nan'),
                 'precision': float('nan'),

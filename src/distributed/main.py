@@ -5,7 +5,12 @@ from codecarbon import track_emissions
 from src.distributed.utils import seed_everything
 from src.distributed.Simulator import Simulator, Event
 from src.distributed.LearningConfig import LearningConfig
-from src.distributed.Monitors import ActivationPatientsMonitor, PerformanceDriftMonitor, PeriodicInferenceMonitor
+from src.distributed.Monitors import (
+    ActivationPatientsMonitor,
+    AdwinGlobalErrorMonitor,
+    PerformanceDriftMonitor,
+    PeriodicInferenceMonitor,
+)
 
 
 def load_patients(data_folder: str) -> tuple[list[dict], pd.Timestamp, pd.Timestamp]:
@@ -73,6 +78,13 @@ def schedule_trainings(experiment: str, simulator: Simulator, min_time: pd.Times
             threshold_mode=config.drift_threshold_mode,
             higher_is_worse=config.drift_higher_is_worse,
         )
+    elif experiment == 'adwin_global_error':
+        AdwinGlobalErrorMonitor(
+            simulator=simulator,
+            bootstrap_months=simulator.config.drift_bootstrap_months,
+            inference_interval_days=simulator.config.drift_inference_interval_days,
+            delta=simulator.config.adwin_delta,
+        )
 
 #@track_emissions
 def run_simulation(seed: int, experiment: str) -> None:
@@ -112,7 +124,7 @@ if __name__ == "__main__":
     config = LearningConfig()
     data_folder = 'T1DiabetesGranada/split-labeled'
     seeds = [0]
-    experiments = ['RetrainAfterPerformanceDrift'] #['RetrainEachNDTsActivated', 'RetrainAfterTime', 'RetrainAfterPerformanceDrift']
+    experiments = ['adwin_global_error'] #['adwin_global_error', 'RetrainEachNDTsActivated', 'RetrainAfterTime', 'RetrainAfterPerformanceDrift']
 
     for experiment in experiments:
         Path(f'{config.data_export_path}/{experiment}').mkdir(parents=True, exist_ok=True)

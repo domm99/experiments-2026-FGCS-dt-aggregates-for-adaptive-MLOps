@@ -313,6 +313,284 @@ class PerformanceDriftMonitor(Monitor):
         return (delta / baseline_scale) >= self._degradation_threshold
 
 
+class AdwinGlobalErrorMonitor(Monitor):
+    POLICY_NAME = 'adwin_global_error'
+
+    def __init__(
+        self,
+        simulator: Simulator,
+        bootstrap_months: int,
+        inference_interval_days: int,
+        delta: float = 0.002,
+        train_priority: int = 1,
+        inference_priority: int = 2,
+    ) -> None:
+        super().__init__(simulator)
+        self._bootstrap_months = bootstrap_months
+        self._inference_interval_days = inference_interval_days
+        self._delta = delta
+        self._train_priority = train_priority
+        self._inference_priority = inference_priority
+        self._source = self.POLICY_NAME
+        self._training_pending = False
+        self._adwin = self._new_adwin()
+
+    def on_start(self) -> None:
+        self._schedule_train(
+            self._simulator.time + pd.DateOffset(months=self._bootstrap_months),
+            reason='adwin_global_error_bootstrap',
+        )
+
+    def on_event(self, event: Event) -> None:
+        if event.event_type == 'TRAIN':
+            if self._simulator.state.last_training_time != event.time:
+                self._training_pending = False
+                return
+            self._reset_adwin()
+            self._training_pending = False
+            print(
+                f'{self.POLICY_NAME} | retraining_timestep={event.time} | '
+                'adwin_reset=True'
+            )
+            self._schedule_inference(
+                event.time + pd.DateOffset(days=self._inference_interval_days),
+                event.time,
+            )
+            return
+
+        if event.event_type != 'INFERENCE':
+            return
+
+        if event.payload.get('source') != self._source:
+            return
+
+        last_training_time = event.payload['last_training_time']
+        detection_time = event.time
+        if self._simulator.state.last_training_time != last_training_time:
+            return
+
+        prediction_count, error_count = self._prediction_error_counts()
+        drift_detected = False
+        global_error_t = float('nan')
+        retraining_timestep = None
+        train_event_scheduled = False
+
+        if prediction_count > 0:
+            global_error_t = error_count / prediction_count
+            drift_detected = self._update_adwin(global_error_t)
+            if drift_detected and not self._training_pending:
+                scheduled_retraining_timestep = detection_time
+                train_event_scheduled = self._schedule_train(
+                    scheduled_retraining_timestep,
+                    reason='adwin_global_error_drift',
+                )
+                self._training_pending = train_event_scheduled
+                if train_event_scheduled:
+                    retraining_timestep = scheduled_retraining_timestep
+
+        width = self._adwin_metric(('width', 'window_size', 'n_samples'))
+        estimation = self._adwin_metric(('estimation', 'mean', 'mean_', 'total_mean'))
+        self._print_log(
+            detection_time=detection_time,
+            global_error_t=global_error_t,
+            prediction_count=prediction_count,
+            drift_detected=drift_detected,
+            width=width,
+            estimation=estimation,
+            retraining_timestep=retraining_timestep,
+        )
+        self._export_log(
+            detection_time=detection_time,
+            last_training_time=last_training_time,
+            global_error_t=global_error_t,
+            prediction_count=prediction_count,
+            error_count=error_count,
+            drift_detected=drift_detected,
+            width=width,
+            estimation=estimation,
+            retraining_timestep=retraining_timestep,
+            train_event_scheduled=train_event_scheduled,
+        )
+        self._schedule_inference(
+            detection_time + pd.DateOffset(days=self._inference_interval_days),
+            last_training_time,
+        )
+
+    def _new_adwin(self):
+        try:
+            from river import drift
+        except ImportError as exc:
+            raise ImportError(
+                'The adwin_global_error policy requires river. '
+                'Install project dependencies before running this baseline.'
+            ) from exc
+
+        try:
+            return drift.ADWIN(delta=self._delta)
+        except TypeError:
+            adwin = drift.ADWIN()
+            if hasattr(adwin, 'delta'):
+                try:
+                    setattr(adwin, 'delta', self._delta)
+                except (AttributeError, TypeError):
+                    pass
+            return adwin
+
+    def _reset_adwin(self) -> None:
+        self._adwin = self._new_adwin()
+
+    def _schedule_train(self, time: pd.Timestamp, reason: str) -> bool:
+        return self._simulator.schedule_event(
+            Event(
+                time=time,
+                priority=self._train_priority,
+                event_type='TRAIN',
+                payload={'reason': reason, 'policy': self.POLICY_NAME},
+            )
+        )
+
+    def _schedule_inference(self, time: pd.Timestamp, last_training_time: pd.Timestamp) -> bool:
+        return self._simulator.schedule_event(
+            Event(
+                time=time,
+                priority=self._inference_priority,
+                event_type='INFERENCE',
+                payload={
+                    'last_training_time': last_training_time,
+                    'source': self._source,
+                    'policy': self.POLICY_NAME,
+                },
+            )
+        )
+
+    def _prediction_error_counts(self) -> tuple[int, int]:
+        prediction_count = 0
+        error_count = 0
+
+        for result in self._simulator.state.last_inference_results:
+            if result.get('status') != 'evaluated':
+                continue
+            prediction_count += self._int_metric(result, 'prediction_count')
+            error_count += self._int_metric(result, 'prediction_error_count')
+
+        return prediction_count, error_count
+
+    def _int_metric(self, result: dict, name: str) -> int:
+        value = result.get(name, 0)
+        if value is None or pd.isna(value):
+            return 0
+        return int(value)
+
+    def _update_adwin(self, value: float) -> bool:
+        update_result = self._adwin.update(value)
+        drift_from_result = self._drift_detected(update_result)
+        if drift_from_result is not None:
+            return drift_from_result
+        drift_from_detector = self._drift_detected(self._adwin)
+        return bool(drift_from_detector)
+
+    def _drift_detected(self, obj) -> bool | None:
+        if obj is None:
+            return None
+        if isinstance(obj, bool):
+            return obj
+        if isinstance(obj, dict):
+            for key in ('drift_detected', 'change_detected', 'in_drift'):
+                if key in obj:
+                    return bool(obj[key])
+            return None
+        if isinstance(obj, (tuple, list)):
+            for item in obj:
+                if isinstance(item, bool):
+                    return item
+            return None
+
+        for attr_name in ('drift_detected', 'change_detected', 'in_drift'):
+            if not hasattr(obj, attr_name):
+                continue
+            value = getattr(obj, attr_name)
+            if callable(value):
+                try:
+                    value = value()
+                except TypeError:
+                    continue
+            return bool(value)
+        return None
+
+    def _adwin_metric(self, names: tuple[str, ...]):
+        for name in names:
+            if not hasattr(self._adwin, name):
+                continue
+            value = getattr(self._adwin, name)
+            if callable(value):
+                try:
+                    value = value()
+                except TypeError:
+                    continue
+            return value
+        return None
+
+    def _print_log(
+        self,
+        detection_time: pd.Timestamp,
+        global_error_t: float,
+        prediction_count: int,
+        drift_detected: bool,
+        width,
+        estimation,
+        retraining_timestep: pd.Timestamp | None,
+    ) -> None:
+        print(
+            f'{self.POLICY_NAME} | timestep={detection_time} | '
+            f'global_error_t={global_error_t:.6f} | '
+            f'prediction_count={prediction_count} | '
+            f'adwin_drift={drift_detected} | '
+            f'adwin_width={width} | '
+            f'adwin_estimation={estimation} | '
+            f'retraining_timestep={retraining_timestep}'
+        )
+
+    def _export_log(
+        self,
+        detection_time: pd.Timestamp,
+        last_training_time: pd.Timestamp,
+        global_error_t: float,
+        prediction_count: int,
+        error_count: int,
+        drift_detected: bool,
+        width,
+        estimation,
+        retraining_timestep: pd.Timestamp | None,
+        train_event_scheduled: bool,
+    ) -> None:
+        metrics = {
+            'policy': self.POLICY_NAME,
+            'timestep': detection_time,
+            'last_training_time': last_training_time,
+            'global_error_t': global_error_t,
+            'prediction_count': prediction_count,
+            'prediction_error_count': error_count,
+            'adwin_drift_detected': drift_detected,
+            'adwin_width': width,
+            'adwin_estimation': estimation,
+            'retraining_timestep': retraining_timestep,
+            'train_event_scheduled': train_event_scheduled,
+            'delta': self._delta,
+            'simulation_end_time': self._simulator.ending_time,
+        }
+
+        output_dir = Path(self._simulator.config.data_export_path) / self._simulator.experiment
+        output_dir.mkdir(parents=True, exist_ok=True)
+        output_path = output_dir / f'{self.POLICY_NAME}_log-seed_{self._simulator.seed}.csv'
+
+        if output_path.exists():
+            metrics_df = pd.read_csv(output_path)
+            metrics_df = pd.concat([metrics_df, pd.DataFrame([metrics])], ignore_index=True)
+        else:
+            metrics_df = pd.DataFrame([metrics])
+        metrics_df.to_csv(output_path, index=False)
+
+
 class PeriodicInferenceMonitor(Monitor):
 
     def __init__(
