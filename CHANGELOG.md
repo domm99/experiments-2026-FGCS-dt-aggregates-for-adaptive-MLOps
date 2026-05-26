@@ -1,3 +1,13 @@
+## [1.2.0](https://github.com/domm99/experiments-2026-FGCS-dt-aggregates-for-adaptive-MLOps/compare/1.1.0...1.2.0) (2026-05-26)
+
+### Features
+
+* add adwin monitor ([6608122](https://github.com/domm99/experiments-2026-FGCS-dt-aggregates-for-adaptive-MLOps/commit/66081220ed554e6ca4e6f968c6f1a014762fa4a9))
+
+### General maintenance
+
+* **release:** update .env versions to 1.1.0 [skip ci] ([e48569b](https://github.com/domm99/experiments-2026-FGCS-dt-aggregates-for-adaptive-MLOps/commit/e48569b4152da122dfea28a3882a40df2a42ad86))
+
 ## [1.1.0](https://github.com/domm99/experiments-2026-FGCS-dt-aggregates-for-adaptive-MLOps/compare/1.0.0...1.1.0) (2026-05-25)
 
 ### Features
